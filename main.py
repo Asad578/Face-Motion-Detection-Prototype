@@ -27,6 +27,7 @@ def main():
     
     # Grace timers for different violation types
     no_face_timer = None
+    multiple_faces_timer = None
     face_distance_timer = None
     head_movement_timer = None
     eye_movement_timer = None
@@ -43,22 +44,49 @@ def main():
 
         # Check for no face detection
         if len(faces) == 0:
+            # No face detected - wait 1.5 seconds before counting as violation
             if no_face_timer is None:
-                no_face_timer = CountdownTimer(NO_FACE_GRACE_PERIOD)
-            if no_face_timer.expired():
+                # Start 1.5-second timer before counting violation
+                no_face_timer = CountdownTimer(1.5)
+            elif no_face_timer.expired():
+                # 1.5 seconds passed without face - count violation and start grace period
                 if not violations.register(vt.NO_FACE):
+                    # Max violations exceeded - stop test
+                    print("Max violations reached - test stopped")
                     break
+                # Start 3-second grace timer to detect face
+                no_face_timer = CountdownTimer(NO_FACE_GRACE_PERIOD)
+                print(f"No face detected - violation counted. Waiting {NO_FACE_GRACE_PERIOD}s for face...")
             face_aligned = False
             face_alignment_timer = None
         else:
+            # Face detected - reset grace period timer
+            if no_face_timer is not None:
+                print("Face detected - timer reset")
             no_face_timer = None
 
         # Check for multiple faces
         if len(faces) > 1:
-            if not violations.register(vt.MULTIPLE_FACES):
-                break
+            # Multiple faces detected - wait 1.5 seconds before counting as violation
+            if multiple_faces_timer is None:
+                # Start 1.5-second timer before counting violation
+                multiple_faces_timer = CountdownTimer(1.5)
+            elif multiple_faces_timer.expired():
+                # 1.5 seconds passed with multiple faces - count violation and start grace period
+                if not violations.register(vt.MULTIPLE_FACES):
+                    # Max violations exceeded - stop test
+                    print("Max violations reached - test stopped")
+                    break
+                # Start 3-second grace timer for faces to go back to 1
+                multiple_faces_timer = CountdownTimer(NO_FACE_GRACE_PERIOD)
+                print(f"Multiple faces detected - violation counted. Waiting {NO_FACE_GRACE_PERIOD}s...")
             face_aligned = False
             face_alignment_timer = None
+        else:
+            # Face count is 1 or 0 - reset multiple faces timer
+            if multiple_faces_timer is not None:
+                print("Multiple faces resolved - timer reset")
+            multiple_faces_timer = None
 
         # Process single face
         if len(faces) == 1:
