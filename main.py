@@ -70,7 +70,7 @@ def main():
             # Multiple faces detected - wait 1.5 seconds before counting as violation
             if multiple_faces_timer is None:
                 # Start 1.5-second timer before counting violation
-                multiple_faces_timer = CountdownTimer(1.5)
+                multiple_faces_timer = CountdownTimer(1)
             elif multiple_faces_timer.expired():
                 # 1.5 seconds passed with multiple faces - count violation and start grace period
                 if not violations.register(vt.MULTIPLE_FACES):
@@ -95,15 +95,31 @@ def main():
             
             # Check face distance (too close or too far)
             if not is_face_distance_valid(face, frame.shape):
+                # Distance invalid (too close or too far)
                 if face_distance_timer is None:
-                    face_distance_timer = CountdownTimer(VIOLATION_GRACE_PERIOD)
-                if face_distance_timer.expired():
+                    # Start 1-second timer before counting violation
+                    face_distance_timer = CountdownTimer(1)
+
+                elif face_distance_timer.expired():
+                    # Invalid distance persisted for 1 second → violation
                     if not violations.register(vt.FACE_DISTANCE):
+                        print("Max violations reached - test stopped")
                         break
+
+                    # Reset timer after counting violation
+                    face_distance_timer = None
+                    print("Face distance violation counted")
+
                 face_aligned = False
                 face_alignment_timer = None
+
             else:
+                # Distance back to valid → reset timer
+                if face_distance_timer is not None:
+                    print("Face distance valid - timer reset")
+
                 face_distance_timer = None
+
 
                 # Check head movement (only if head straight check returns a value)
                 if head_straight is not None and not head_straight:
