@@ -120,7 +120,6 @@ def main():
 
                 # Check head movement (left/right)
                 head_straight = is_head_straight(face, frame.shape)
-
                 if not head_straight:
                     if head_movement_timer is None:
                         # Start 1-second timer before violation
