@@ -1,35 +1,20 @@
-import cv2
-import os
+from config.settings import HEAD_CENTER_DEVIATION_THRESHOLD
 
-def is_head_straight(frame):
+def is_head_straight(face, frame_shape):
     """
-    Checks if head is approximately straight to the camera.
-    Uses face detection bounding box to estimate head orientation.
-    Returns True if head is straight, False otherwise, None if no face detected.
+    Strict horizontal head movement detection.
+    Works symmetrically for left and right.
     """
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    cascade_path = os.path.join(current_dir, "haarcascade_frontalface_default.xml")
-
-    # Load face cascade classifier
-    face_cascade = cv2.CascadeClassifier(cascade_path)
-    
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-    
-    if len(faces) == 0:
-        return None
-    
-    # Check if face is roughly centered in the frame (indicating straight head)
-    face = faces[0]  # Get first face
     x, y, w, h = face
-    
-    frame_height, frame_width = frame.shape[:2]
-    face_center_x = x + w / 2
-    frame_center_x = frame_width / 2
-    
-    # Calculate horizontal deviation from center (normalized)
-    deviation = abs(face_center_x - frame_center_x) / frame_width
-    
-    # Head is considered straight if deviation < 0.15 (15% of frame width)
-    return deviation < 0.15
+    frame_width = frame_shape[1]
 
+    face_left = x
+    face_right = x + w
+    frame_center = frame_width / 2
+
+    left_offset = abs(face_left - frame_center) / frame_width
+    right_offset = abs(face_right - frame_center) / frame_width
+
+    deviation = min(left_offset, right_offset)
+
+    return deviation <= HEAD_CENTER_DEVIATION_THRESHOLD

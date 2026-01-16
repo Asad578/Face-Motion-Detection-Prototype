@@ -1,6 +1,6 @@
 import cv2
 import time
-
+import mediapipe as mp
 from camera.camera_manager import CameraManager
 from camera.camera_stream import CameraStream
 from detectors.face_detector import detect_faces
@@ -10,13 +10,15 @@ from validators.face_distance import is_face_distance_valid
 from violations.violation_manager import ViolationManager
 from violations import violation_types as vt
 from timers.countdown_timer import CountdownTimer
-from utils.drawing import draw_text
+from utils.drawing import draw_text, draw_face_mesh
+from detectors.face_mesh_service import FaceMeshService
 from config.settings import *
 
 def main():
     camera = CameraManager()
     stream = CameraStream(camera)
     violations = ViolationManager()
+    face_mesh = FaceMeshService.get()
 
     test_timer = CountdownTimer(TEST_DURATION_SECONDS)
     test_start_time = time.time()
@@ -91,7 +93,6 @@ def main():
         # Process single face
         if len(faces) == 1:
             face = faces[0]
-            head_straight = is_head_straight(frame)
             
             # Check face distance (too close or too far)
             if not is_face_distance_valid(face, frame.shape):
@@ -109,41 +110,41 @@ def main():
                     # Reset timer after counting violation
                     face_distance_timer = None
                     print("Face distance violation counted")
-
                 face_aligned = False
                 face_alignment_timer = None
-
             else:
                 # Distance back to valid → reset timer
                 if face_distance_timer is not None:
                     print("Face distance valid - timer reset")
-
                 face_distance_timer = None
 
+                # Check head movement (left/right)
+                head_straight = is_head_straight(face, frame.shape)
 
-                # Check head movement (only if head straight check returns a value)
-                if head_straight is not None and not head_straight:
+                if not head_straight:
                     if head_movement_timer is None:
-                        head_movement_timer = CountdownTimer(VIOLATION_GRACE_PERIOD)
-                    if head_movement_timer.expired():
+                        # Start 1-second timer before violation
+                        head_movement_timer = CountdownTimer(1)
+
+                    elif head_movement_timer.expired():
+                        # Head turned for 1 second → violation
                         if not violations.register(vt.HEAD_MOVEMENT):
+                            print("Max violations reached - test stopped")
                             break
+
+                        # Reset timer after violation
+                        head_movement_timer = None
+                        print("Head movement violation counted")
+
                     face_aligned = False
                     face_alignment_timer = None
+
                 else:
+                    # Head straight again → reset timer
+                    if head_movement_timer is not None:
+                        print("Head straight - timer reset")
                     head_movement_timer = None
 
-                    # If face distance is valid and head is straight, start alignment timer
-                    if head_straight is True:
-                        if face_alignment_timer is None:
-                            face_alignment_timer = CountdownTimer(FACE_ALIGNMENT_GRACE_PERIOD)
-                            print("Face aligned - waiting 5 seconds to stabilize...")
-                        
-                        if face_alignment_timer.expired():
-                            face_aligned = True
-                    else:
-                        face_aligned = False
-                        face_alignment_timer = None
 
                     # Check eye movement (only when face is properly aligned)
                     if face_aligned and is_eye_movement_suspicious(frame):
@@ -164,6 +165,16 @@ def main():
         if face_alignment_timer is not None and not face_aligned:
             alignment_time_left = max(0, FACE_ALIGNMENT_GRACE_PERIOD - (time.time() - face_alignment_timer.start_time))
             draw_text(frame, f"Align face: {int(alignment_time_left)}s", 120)
+        
+        # Draw face mesh landmarks
+        # Convert frame to RGB and wrap in MediaPipe Image
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
+
+        # Detect landmarks using the MediaPipe Image
+        face_landmarks_result = face_mesh.detect(mp_image)
+
+        draw_face_mesh(frame, face_landmarks_result.face_landmarks)
 
         cv2.imshow("Online Test Proctoring", frame)
         if cv2.waitKey(1) & 0xFF == ord("q"):
