@@ -11,7 +11,7 @@ from validators.face_distance import is_face_distance_valid
 from violations.violation_manager import ViolationManager
 from violations import violation_types as vt
 from timers.countdown_timer import CountdownTimer
-from utils.drawing import draw_text, draw_face_mesh
+from utils.drawing import draw_text, draw_face_mesh, draw_violations
 from detectors.face_mesh_service import FaceMeshService
 from config.settings import *
 from config.settings import VIOLATION_GRACE_PERIOD
@@ -65,11 +65,11 @@ def main():
             face_aligned = False
             face_alignment_timer = None
             # Skip all other checks when no face is detected
-            cv2.imshow("Online Test Proctoring", frame)
             elapsed_time = time.time() - test_start_time
             time_left = max(0, TEST_DURATION_SECONDS - elapsed_time)
             draw_text(frame, f"Time Left: {int(time_left)}s", 40)
             draw_text(frame, f"Violations: {violations.attempts}/{MAX_VIOLATIONS}", 80)
+            draw_violations(frame, violations.get_active_violations())
             cv2.imshow("Online Test Proctoring", frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
@@ -98,11 +98,11 @@ def main():
             face_aligned = False
             face_alignment_timer = None
             # Skip all other checks when multiple faces detected
-            cv2.imshow("Online Test Proctoring", frame)
             elapsed_time = time.time() - test_start_time
             time_left = max(0, TEST_DURATION_SECONDS - elapsed_time)
             draw_text(frame, f"Time Left: {int(time_left)}s", 40)
             draw_text(frame, f"Violations: {violations.attempts}/{MAX_VIOLATIONS}", 80)
+            draw_violations(frame, violations.get_active_violations())
             cv2.imshow("Online Test Proctoring", frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
@@ -190,25 +190,25 @@ def main():
                             print("Head straight - timer reset")
                         head_movement_timer = None
 
-                        # Eye movement check (ONLY when head is straight)
-                        if is_eye_movement_suspicious(frame):
-                            if eye_movement_timer is None:
-                                eye_movement_timer = CountdownTimer(EYE_MOVEMENT_GRACE_PERIOD)
+                        # # Eye movement check (ONLY when head is straight)
+                        # if is_eye_movement_suspicious(frame):
+                        #     if eye_movement_timer is None:
+                        #         eye_movement_timer = CountdownTimer(EYE_MOVEMENT_GRACE_PERIOD)
 
-                            elif eye_movement_timer.expired():
-                                if not violations.register(vt.EYE_MOVEMENT):
-                                    break
-                                # Start grace period after violation
-                                violation_grace_timer = CountdownTimer(VIOLATION_GRACE_PERIOD)
-                        else:
-                            eye_movement_timer = None
-
+                        #     elif eye_movement_timer.expired():
+                        #         if not violations.register(vt.EYE_MOVEMENT):
+                        #             break
+                        #         # Start grace period after violation
+                        #         violation_grace_timer = CountdownTimer(VIOLATION_GRACE_PERIOD)
+                        # else:
+                        #     eye_movement_timer = None
 
         elapsed_time = time.time() - test_start_time
         time_left = max(0, TEST_DURATION_SECONDS - elapsed_time)
         
         draw_text(frame, f"Time Left: {int(time_left)}s", 40)
         draw_text(frame, f"Violations: {violations.attempts}/{MAX_VIOLATIONS}", 80)
+        draw_violations(frame, violations.get_active_violations())
         
         if face_alignment_timer is not None and not face_aligned:
             alignment_time_left = max(0, FACE_ALIGNMENT_GRACE_PERIOD - (time.time() - face_alignment_timer.start_time))

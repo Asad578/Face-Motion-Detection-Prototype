@@ -80,3 +80,38 @@ def draw_face_mesh(frame, face_landmarks):
     
     # Blend overlay with frame (70% transparency = 30% opacity of overlay)
     cv2.addWeighted(overlay, 0.4, frame, 0.8, 0, frame)
+
+def draw_violations(frame, violations):
+    """
+    Draw violations on the bottom right corner of the frame in red.
+    Violations flow from bottom to top (newest at bottom).
+    
+    Args:
+        frame: The input frame to draw on
+        violations: List of violation strings to display
+    """
+    if not violations:
+        return
+    
+    h, w = frame.shape[:2]
+    red = (0, 0, 255)  # BGR format
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.7
+    thickness = 2
+    line_spacing = 30  # pixels between each violation text
+    margin_right = 20  # pixels from right edge
+    margin_bottom = 20  # pixels from bottom edge
+    
+    # Draw violations from bottom to top (newest at bottom)
+    # Reverse the list so that the first violation (oldest) appears at top
+    for i, violation in enumerate(reversed(violations)):
+        # Calculate y position from bottom upwards
+        y_position = h - margin_bottom - (i * line_spacing)
+        
+        # Get text size to right-align it
+        text_size = cv2.getTextSize(violation, font, font_scale, thickness)[0]
+        x_position = w - margin_right - text_size[0]
+        
+        # Draw red text
+        cv2.putText(frame, violation, (x_position, y_position),
+                    font, font_scale, red, thickness)
