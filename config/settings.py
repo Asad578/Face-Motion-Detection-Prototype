@@ -9,7 +9,7 @@ MAX_VIOLATIONS = 30
 FACE_MIN_AREA_RATIO = 0.05
 FACE_MAX_AREA_RATIO = 0.22
 
-# Head pose (MediaPipe normalized units)
+# Head pose
 HEAD_YAW_THRESHOLD = 0.10     # 10% left/right
 HEAD_PITCH_THRESHOLD = 0.06   # 6% up/down
 
