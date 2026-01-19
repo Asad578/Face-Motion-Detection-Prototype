@@ -164,7 +164,6 @@ def main():
                     # Grace period ended or doesn't exist
                     violation_grace_timer = None
                     
-                    # Check head movement (left/right)
                     # Head alignment check
                     face_aligned = is_face_aligned(face_landmarks)
 

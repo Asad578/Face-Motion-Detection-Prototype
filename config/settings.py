@@ -11,7 +11,7 @@ FACE_MAX_AREA_RATIO = 0.22
 
 # Head pose (MediaPipe normalized units)
 HEAD_YAW_THRESHOLD = 0.10     # 10% left/right
-HEAD_PITCH_THRESHOLD = 0.08   # 8% up/down
+HEAD_PITCH_THRESHOLD = 0.06   # 6% up/down
 
 # Eye movement
 EYE_MOVEMENT_THRESHOLD = 0.35
