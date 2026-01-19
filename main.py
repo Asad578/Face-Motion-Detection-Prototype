@@ -5,6 +5,7 @@ from camera.camera_manager import CameraManager
 from camera.camera_stream import CameraStream
 from detectors.face_detector import detect_faces
 from detectors.head_pose_detector import is_head_straight
+from validators.face_alignment import is_face_aligned
 from detectors.eye_gaze_detector import is_eye_movement_suspicious
 from validators.face_distance import is_face_distance_valid
 from violations.violation_manager import ViolationManager
@@ -92,6 +93,19 @@ def main():
 
         # Process single face
         if len(faces) == 1:
+            # ---- Face mesh detection (MUST happen first) ----
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
+            face_landmarks_result = face_mesh.detect(mp_image)
+
+            if not face_landmarks_result.face_landmarks:
+                face_aligned = False
+                head_movement_timer = None
+                eye_movement_timer = None
+                continue
+
+            face_landmarks = face_landmarks_result.face_landmarks[0]
+
             face = faces[0]
             
             # Check face distance (too close or too far)
@@ -119,41 +133,41 @@ def main():
                 face_distance_timer = None
 
                 # Check head movement (left/right)
-                head_straight = is_head_straight(face, frame.shape)
-                if not head_straight:
+                # Head alignment check
+                face_aligned = is_face_aligned(face_landmarks)
+
+                if not face_aligned:
                     if head_movement_timer is None:
-                        # Start 1-second timer before violation
-                        head_movement_timer = CountdownTimer(1)
+                        head_movement_timer = CountdownTimer(HEAD_MOVEMENT_GRACE_PERIOD)
 
                     elif head_movement_timer.expired():
-                        # Head turned for 1 second → violation
                         if not violations.register(vt.HEAD_MOVEMENT):
                             print("Max violations reached - test stopped")
                             break
 
-                        # Reset timer after violation
-                        head_movement_timer = None
                         print("Head movement violation counted")
+                        head_movement_timer = None
 
-                    face_aligned = False
-                    face_alignment_timer = None
+                    # Do NOT evaluate eyes when head is not aligned
+                    eye_movement_timer = None
 
                 else:
-                    # Head straight again → reset timer
+                    # Head is straight again
                     if head_movement_timer is not None:
                         print("Head straight - timer reset")
                     head_movement_timer = None
 
-
-                    # Check eye movement (only when face is properly aligned)
-                    if face_aligned and is_eye_movement_suspicious(frame):
+                    # Eye movement check (ONLY when head is straight)
+                    if is_eye_movement_suspicious(frame):
                         if eye_movement_timer is None:
-                            eye_movement_timer = CountdownTimer(VIOLATION_GRACE_PERIOD)
-                        if eye_movement_timer.expired():
+                            eye_movement_timer = CountdownTimer(EYE_MOVEMENT_GRACE_PERIOD)
+
+                        elif eye_movement_timer.expired():
                             if not violations.register(vt.EYE_MOVEMENT):
                                 break
                     else:
                         eye_movement_timer = None
+
 
         elapsed_time = time.time() - test_start_time
         time_left = max(0, TEST_DURATION_SECONDS - elapsed_time)
@@ -166,14 +180,7 @@ def main():
             draw_text(frame, f"Align face: {int(alignment_time_left)}s", 120)
         
         # Draw face mesh landmarks
-        # Convert frame to RGB and wrap in MediaPipe Image
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
-
-        # Detect landmarks using the MediaPipe Image
-        face_landmarks_result = face_mesh.detect(mp_image)
-
-        draw_face_mesh(frame, face_landmarks_result.face_landmarks)
+        draw_face_mesh(frame, [face_landmarks])
 
         cv2.imshow("Online Test Proctoring", frame)
         if cv2.waitKey(1) & 0xFF == ord("q"):

@@ -1,20 +1,34 @@
-from config.settings import HEAD_CENTER_DEVIATION_THRESHOLD
+from config.settings import HEAD_YAW_THRESHOLD, HEAD_PITCH_THRESHOLD
 
-def is_head_straight(face, frame_shape):
-    """
-    Strict horizontal head movement detection.
-    Works symmetrically for left and right.
-    """
-    x, y, w, h = face
-    frame_width = frame_shape[1]
+# MediaPipe landmark indices
+NOSE_TIP = 1
+LEFT_CHEEK = 234
+RIGHT_CHEEK = 454
+FOREHEAD = 10
+CHIN = 152
 
-    face_left = x
-    face_right = x + w
-    frame_center = frame_width / 2
+def is_head_straight(landmarks):
+    if not landmarks or len(landmarks) < 455:
+        return False
 
-    left_offset = abs(face_left - frame_center) / frame_width
-    right_offset = abs(face_right - frame_center) / frame_width
+    nose = landmarks[NOSE_TIP]
+    left_cheek = landmarks[LEFT_CHEEK]
+    right_cheek = landmarks[RIGHT_CHEEK]
+    forehead = landmarks[FOREHEAD]
+    chin = landmarks[CHIN]
 
-    deviation = min(left_offset, right_offset)
+    # --- Horizontal rotation (Yaw) ---
+    mid_cheeks_x = (left_cheek.x + right_cheek.x) / 2
+    face_width = abs(right_cheek.x - left_cheek.x)
+    yaw = (nose.x - mid_cheeks_x) / face_width  # normalized relative to face width
 
-    return deviation <= HEAD_CENTER_DEVIATION_THRESHOLD
+    # --- Vertical rotation (Pitch) ---
+    mid_forehead_chin_y = (forehead.y + chin.y) / 2
+    face_height = abs(chin.y - forehead.y)
+    pitch = (nose.y - mid_forehead_chin_y) / face_height  # normalized relative to face height
+
+    # Check thresholds
+    return (
+        abs(yaw) <= HEAD_YAW_THRESHOLD and
+        abs(pitch) <= HEAD_PITCH_THRESHOLD
+    )
